@@ -89,7 +89,7 @@ app.post("/incoming", (req, res) => {
   client.messages
     .create({
       body: responseBody,
-      from: twilioPhone,
+      from: `whatsapp:${twilioPhone}`,
       to: fromNumber,
     })
     .then(() => {

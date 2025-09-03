@@ -1,6 +1,7 @@
 import express from "express";
 import pkg from "twilio";
 const { Twilio, validateRequest } = pkg;
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 
@@ -21,6 +22,34 @@ const authToken = process.env.AUTH_TOKEN;
 const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
 const client = new Twilio(accountSid, authToken);
 const port = process.env.PORT || 3000;
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+async function getAIResponse(message) {
+  const prompt = `
+  You are "ShoSure", a helpful and friendly fact-checking chatbot on WhatsApp for Nigerian users. You speak in a natural, conversational style, often using Nigerian Pidgin and English, you can also use yoruba, igbo, Hausa, and other Nigerian languages based on what the user wants. Your goal is to caution users about potential misinformation without being harsh.
+
+  A user has sent you this message: "${message}"
+
+  If this message looks like a common rumor, scam, or unverified news (e.g., about money, health, politics, school fees, fuel prices, etc.), please provide a helpful and factual response. Be concise and witty if possible.
+
+  If the message is just a greeting (like 'hi', 'hello') or small talk, respond warmly as a bot would.
+  If the message is not a rumor, or if you are not sure, politely say you are not sure and encourage them to check official sources.
+
+  Remember to keep your response short enough for a WhatsApp message.
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    return text;
+  } catch (error) {
+    console.error("Error calling Gemini API:", error);
+    return "Abeg, my brain no dey work well now. Try again small time. 🙏";
+  }
+}
 
 const factDatabase = {
   "school fee": {
@@ -59,7 +88,7 @@ const findFactCheck = (message) => {
   return factDatabase.default.response;
 };
 
-app.post("/incoming", (req, res) => {
+app.post("/incoming", async (req, res) => {
   const twilioSignature = req.headers["x-twilio-signature"];
   const url = "https://shosure.onrender.com/incoming";
   const params = req.body;
@@ -83,7 +112,7 @@ app.post("/incoming", (req, res) => {
     responseBody =
       "Ẹni bá mọ ọrọ̀ tó ń lọ, kò ní pa àparò pẹ́. (He who knows what is happening will not kill a partridge in vain.)";
   } else {
-    responseBody = findFactCheck(cleanedMessage);
+    responseBody = await getAIResponse(cleanedMessage);
   }
 
   client.messages

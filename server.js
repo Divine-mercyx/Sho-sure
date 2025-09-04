@@ -4,6 +4,8 @@ const { Twilio, validateRequest } = pkg;
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
+import cron from "node-cron";
+import axios from "axios";
 
 dotenv.config();
 
@@ -88,6 +90,8 @@ const findFactCheck = (message) => {
   return factDatabase.default.response;
 };
 
+const serverUrl = "https://shosure.onrender.com";
+
 app.post("/incoming", async (req, res) => {
   const twilioSignature = req.headers["x-twilio-signature"];
   const url = "https://shosure.onrender.com/incoming";
@@ -129,6 +133,15 @@ app.post("/incoming", async (req, res) => {
       console.error(err);
       res.status(500).send(err);
     });
+});
+
+cron.schedule("*/10 * * * *", async () => {
+  try {
+    await axios.get(serverUrl);
+    console.log("Pinged server to keep it awake");
+  } catch (error) {
+    console.error("Failed to ping server:", error.message);
+  }
 });
 
 app.listen(port, () => {
